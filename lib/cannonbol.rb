@@ -1,8 +1,5 @@
 require "cannonbol/version"
 
-# no parameters are constants pointing to the pattern instance
-
-
 module Cannonbol
   
   class Needle
@@ -14,9 +11,11 @@ module Cannonbol
       @string = string
     end
     
-    def thread(pattern, opts = {})
+    def thread(pattern, opts = {}, &match_block)
+      @captures = {}
       anchor = opts[:anchor]
       raise_error = opts[:raise_error]
+      replacement_value = opts[:replace_with]
       @cursor = 0
       try_again = true
       while @cursor < @string.length and try_again
@@ -24,6 +23,16 @@ module Cannonbol
         @success_blocks = []
         if pattern._match?(self)
           @success_blocks.each(&:call)
+          match = if match_block
+            match_block.call(*match_block.parameters[0..-1].collect { |param| @captures[param[1].to_sym] })
+          elsif @starting_character
+            if replacement_value
+              @string[@starting_character..@cursor-1] = replacement_value
+              @string
+            else
+              @string[@starting_character..@cursor-1]
+            end
+          end
           return match
         end
         try_again = !anchor
@@ -31,6 +40,11 @@ module Cannonbol
       end
       raise "No Match" if raise_error 
     end
+    
+    def capture(name, value)
+      @captures[name.to_sym] = value if name
+    end
+      
        
     def remaining_string
       @string[@cursor..-1]
@@ -58,19 +72,11 @@ module Cannonbol
     end
       
   end
-   
-  class Pattern < Array
+  
+  module Operators
     
-    def to_s
-      "#{self.class.name}#{super}"
-    end
-    
-    def match?(s, opts = {})
-      Needle.new(s).thread(self, opts)
-    end
-    
-    def _match?(needle)
-      []
+    def match?(s, opts = {}, &success_block)
+      Needle.new(s).thread(self, opts, &success_block)
     end
     
     def |(pattern)
@@ -81,8 +87,27 @@ module Cannonbol
       Concat.new(self, pattern)
     end
 
-    def on_success(&block)
-      OnSuccess.new(self, &block)
+    def on_success(name = nil, &block)
+      OnSuccess.new(self, name, &block)
+    end
+    
+    def capture_as(name)
+      OnSuccess.new(self, name)
+    end
+    
+  end
+    
+   
+  class Pattern < Array
+    
+    include Operators
+    
+    def to_s
+      "#{self.class.name}#{super}"
+    end
+    
+    def _match?(needle)
+      []
     end
       
   end
@@ -138,8 +163,9 @@ module Cannonbol
   
   class OnSuccess < Pattern
     
-    def initialize(pattern, &block)
+    def initialize(pattern, capture_name = nil, &block)
       @pattern = pattern
+      @capture_name = capture_name
       @block = block
     end
     
@@ -148,7 +174,12 @@ module Cannonbol
       starting_cursor ||= needle.cursor
       if s = @pattern._match?(needle, *s)
         ending_cursor = needle.cursor-1
-        [ needle.push(0) { @block.call(needle.string[starting_cursor..ending_cursor]) }, starting_cursor, s ]
+        push = needle.push(0) do
+          value = needle.string[starting_cursor..ending_cursor]
+          needle.capture(@capture_name, value)
+          @block.call(value) if @block
+        end
+        [ push, starting_cursor, s ]
       end
     end
     
@@ -311,6 +342,7 @@ module Cannonbol
         [match_length, thread_state]
       end
     end
+    
   end
   
   class Break < ParameterizedPattern
@@ -351,21 +383,7 @@ end
 
 class String
   
-  def |(pat_or_string)
-    Cannonbol::Choose.new(self,pat_or_string)
-  end
-  
-  def &(pat_or_string)
-    Cannonbol::Concat.new(self,pat_or_string)
-  end
-  
-  def on_success(&block)
-    Cannonbol::OnSuccess.new(self, &block)
-  end
-  
-  def match?(s, opts = {})
-    Cannonbol::Needle.new(s).thread(self, opts)
-  end
+  include Cannonbol::Operators
   
   def _match?(needle, thread_state = nil)
     if thread_state
@@ -377,6 +395,20 @@ class String
   
 end
 
+class Regexp
+  
+  include Cannonbol::Operators
+  
+  def _match?(needle, thread_state = nil)
+    @cannonbol_regex ||= Regexp.new("^#{self.source}", self.options)
+    if thread_state
+      needle.pull(thread_state)
+    elsif m = @cannonbol_regex.match(needle.remaining_string)
+      [needle.push(m[0].length)]
+    end
+  end
+  
+end
 
 class Object
     

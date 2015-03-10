@@ -105,5 +105,34 @@ describe Cannonbol do
   it 'can use the BREAKX builtin pattern' do
     (BREAKX('E').on_success { |match| expect(match).to eq("INTEG") } & 'ER').match?('INTEGERS', raise_error: true)
   end
+  
+  it 'can replace the match with a fixed value' do
+    expect('hello'.match?("she said hello", replace_with: "goodby")).to eq("she said goodby")
+  end 
+  
+  it 'can replace the match using a block' do
+    match_value = nil
+    pattern = ('hello' | 'goodby').on_success { |match| match_value = match}
+    string = 'she said hello'
+    expect(pattern.match?(string) { "she said #{match_value == 'hello' ? 'sawadii kaa' : 'choke dee kaa'}"}).to eq('she said sawadii kaa')
+  end
+  
+  
+  it 'can use regex patterns' do
+    pattern = /\s*/ & /[a-zA-Z]+/.on_success { |the_word| expect(the_word).to eq('hello') }
+    pattern.match?("      hello!", raise_error: true)
+    pattern.match?("hello", raise_error: true)
+    expect(pattern.match?("...")).to be_falsy
+  end
+  
+  it 'can create match variables using a block' do
+    match_value = nil
+    pattern = ('he' | 'she').capture_as(:gender) & /\s+/ & 'said' & /\s+/ & ('hello' | 'goodby').capture_as(:greeting)
+    string = 'Then she  said  hello'
+    expect(pattern.match?(string) do |gender, greeting| 
+      "klaw #{greeting == 'hello' ? 'sawadii' : 'choke dee'} #{gender == 'he' ? 'kaap' : 'kaa'}"
+      end
+    ).to eq("klaw sawadii kaa")
+  end  
 
 end
