@@ -1,6 +1,29 @@
 require "cannonbol/version"
 
 module Cannonbol
+    
+  class MatchString < String
+    
+    attr_reader :captured
+    attr_reader :match_start
+    attr_reader :match_end
+    
+    def initialize(string, match_start, match_end, captured)
+      @cannonbol_string = string
+      @match_start = match_start
+      @match_end = match_end
+      @captured = captured
+      super(@match_end < 0 ? "" : string[@match_start..@match_end])
+    end 
+    
+    def replace_match_with(s)
+      @cannonbol_string.dup.tap do |new_s| 
+        new_s[@match_start..@match_end] = "" if @match_end >= 0
+        new_s.insert(@match_start, s)
+      end 
+    end
+    
+  end
   
   class Needle
     
@@ -16,22 +39,27 @@ module Cannonbol
       anchor = opts[:anchor]
       raise_error = opts[:raise_error]
       replacement_value = opts[:replace_with]
+      as_hash = opts[:as_hash]
       @cursor = 0
       try_again = true
       while @cursor < @string.length and try_again
         @starting_character = nil
         @success_blocks = []
         if pattern._match?(self)
+          @starting_character ||= @cursor
           @success_blocks.each(&:call)
           match = if match_block
             match_block.call(*match_block.parameters[0..-1].collect { |param| @captures[param[1].to_sym] })
-          elsif @starting_character
-            if replacement_value
-              @string[@starting_character..@cursor-1] = replacement_value
-              @string
-            else
-              @string[@starting_character..@cursor-1]
+          elsif as_hash
+            @captures[as_hash] = @cursor == 0 ? "" : @string[@starting_character..@cursor-1]
+            @captures
+          elsif replacement_value
+            @string.dup.tap do |new_s| 
+              new_s[@starting_character..@cursor-1] = "" if @cursor > 0
+              new_s.insert(@starting_character, replacement_value)
             end
+          else
+            MatchString.new(@string, @starting_character, @cursor-1, @captures)
           end
           return match
         end
@@ -63,10 +91,6 @@ module Cannonbol
       nil
     end
       
-    def match
-      @string[@starting_character..@cursor-1] if @starting_character
-    end
-      
     def fail
       raise "match failure"
     end
@@ -75,8 +99,8 @@ module Cannonbol
   
   module Operators
     
-    def match?(s, opts = {}, &success_block)
-      Needle.new(s).thread(self, opts, &success_block)
+    def match?(s, opts = {}, &match_block)
+      Needle.new(s).thread(self, opts, &match_block)
     end
     
     def |(pattern)
@@ -91,12 +115,15 @@ module Cannonbol
       OnSuccess.new(self, name, &block)
     end
     
+    def on_match(&block)
+      OnMatch.new(self, &block)
+    end
+    
     def capture_as(name)
       OnSuccess.new(self, name)
     end
     
   end
-    
    
   class Pattern < Array
     
@@ -175,7 +202,7 @@ module Cannonbol
       if s = @pattern._match?(needle, *s)
         ending_cursor = needle.cursor-1
         push = needle.push(0) do
-          value = needle.string[starting_cursor..ending_cursor]
+          value = ending_cursor < 0 ? "" : needle.string[starting_cursor..ending_cursor]
           needle.capture(@capture_name, value)
           @block.call(value) if @block
         end
@@ -184,6 +211,23 @@ module Cannonbol
     end
     
   end
+  
+  class OnMatch < Pattern
+    
+    def initialize(pattern, &block)
+      @pattern = pattern
+      @block = block
+    end
+    
+    def _match?(needle, starting_cursor = nil, s=[])
+      starting_cursor ||= needle.cursor
+      if s = @pattern._match?(needle, *s)
+        @block.call(needle.cursor == 0 ? "" : needle.string[starting_cursor..needle.cursor-1])
+        [starting_cursor, s]
+      end
+    end
+    
+  end 
   
   class Rem < Pattern
     

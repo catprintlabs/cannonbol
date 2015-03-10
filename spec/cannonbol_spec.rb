@@ -116,7 +116,7 @@ describe Cannonbol do
     string = 'she said hello'
     expect(pattern.match?(string) { "she said #{match_value == 'hello' ? 'sawadii kaa' : 'choke dee kaa'}"}).to eq('she said sawadii kaa')
   end
-  
+    
   
   it 'can use regex patterns' do
     pattern = /\s*/ & /[a-zA-Z]+/.on_success { |the_word| expect(the_word).to eq('hello') }
@@ -125,14 +125,71 @@ describe Cannonbol do
     expect(pattern.match?("...")).to be_falsy
   end
   
-  it 'can create match variables using a block' do
-    match_value = nil
+  it 'can assign match variables using a block' do
     pattern = ('he' | 'she').capture_as(:gender) & /\s+/ & 'said' & /\s+/ & ('hello' | 'goodby').capture_as(:greeting)
     string = 'Then she  said  hello'
     expect(pattern.match?(string) do |gender, greeting| 
       "klaw #{greeting == 'hello' ? 'sawadii' : 'choke dee'} #{gender == 'he' ? 'kaap' : 'kaa'}"
-      end
-    ).to eq("klaw sawadii kaa")
+    end).to eq("klaw sawadii kaa")
   end  
+  
+  it 'can returns the match data as a hash' do
+    pattern = ('he' | 'she').capture_as(:gender) & /\s+/ & 'said' & /\s+/ & ('hello' | 'goodby').capture_as(:greeting)
+    string = 'Then she  said  hello'
+    match_data = pattern.match?(string)
+    expect(match_data.captured[:gender]).to eq("she")
+    expect(match_data.captured[:greeting]).to eq("hello")
+    expect(match_data).to eq("she  said  hello")
+    expect(pattern.match?("foo bar", as_hash: true)).to be_falsy
+  end  
+  
+  it 'can replace the match string' do
+    pattern = "boy" | "girl" | "man" | "woman"
+    string = "There was a man here."
+    expect(pattern.match?(string).replace_match_with("person")).to eq("There was a person here.")
+  end
+  
+  it 'can do conditional assignments during matching' do
+    conditional_matches = []
+    pattern = ('car' | 'plane' | 'bike').on_match { | m | conditional_matches << m } & '!'
+    string = "he had a car, a plane, and even a  bike!"
+    expect(pattern.match?(string)).to eq("bike!")
+    expect(conditional_matches).to eq(["car", "plane", "bike"])
+  end
+  
+  it 'can do conditional assignments during matching even if the match fails' do
+    arb_matches = []
+    pattern = ARB.on_match { | match | arb_matches << match } & 'gotcha'
+    string = "12345"
+    expect(pattern.match?(string, anchor: true)).to be_falsy
+    expect(arb_matches).to eq(["","1","12","123","1234","12345"])
+  end
+  
+  it 'can insert a string at the beginning of match' do
+    expect(POS(0).match?("hello there").replace_match_with("well ")).to eq("well hello there")
+  end
+  
+  it 'ARBNO'
+  
+  it 'can match recursive patterns'
+   #? ITEM = SPAN(“0123456789") | *LIST
+   #? LIST = ”(“ ITEM ARBNO(”," ITEM) “)”
+   #? TEST = POS(0) LIST RPOS(0)
+   #? “(12,(3,45,(6)),78)” ? TEST
+   #Success
+   #? “(12,(34)” ? TEST
+   #Failure
+
+  it "ABORT"
+  it "FAIL" # ? does fail backtrack 1 character, no must seek the next possible alternative, yes?
+  it "FENCE"
+  it "SUCCEED"
+    #? P = FENCE(TAB(*(N + 1)) $ OUTPUT @N | ABORT)
+    #? “abcd” ? POS(0) $ N SUCCEED P FAIL
+    #a
+    #ab
+    #abc
+    #abcd
+    #Failure
 
 end
