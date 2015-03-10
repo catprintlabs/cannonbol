@@ -1,22 +1,9 @@
 require "cannonbol/version"
 
+# no parameters are constants pointing to the pattern instance
+
+
 module Cannonbol
-  
-  # ways to create a pattern
-  # use & or | operator on string
-  # use other Cannobol operator on a string
-  # Cannonbol.new
-  
-  # matching
-  # call match?(subject) on a pattern or a string 
-  
-  def self.new
-    Pattern.new
-  end
-  
-  def self.match?(pattern, string, anchor = nil)
-    Needle.new(string).thread(pattern, anchor)
-  end
   
   class Needle
     
@@ -27,19 +14,22 @@ module Cannonbol
       @string = string
     end
     
-    def thread(pattern, anchor = nil)
+    def thread(pattern, opts = {})
+      anchor = opts[:anchor]
+      raise_error = opts[:raise_error]
       @cursor = 0
-      @starting_character = nil
-      @success_blocks = []
-      while @cursor < @string.length
+      try_again = true
+      while @cursor < @string.length and try_again
+        @starting_character = nil
+        @success_blocks = []
         if pattern._match?(self)
           @success_blocks.each(&:call)
           return match
         end
-        return nil if anchor
+        try_again = !anchor
         @cursor += 1
       end
-      nil
+      raise "No Match" if raise_error 
     end
        
     def remaining_string
@@ -47,7 +37,7 @@ module Cannonbol
     end
      
     def push(length, &success_block)
-      thread_state = [@starting_character, @cursor, @success_blocks]
+      thread_state = [@starting_character, @cursor, @success_blocks.dup]
       @starting_character ||= @cursor
       @cursor += length
       @success_blocks << success_block if success_block
@@ -55,7 +45,7 @@ module Cannonbol
     end
       
     def pull(thread_state)
-      @starting_character, @cursor = thread_state if thread_state
+      @starting_character, @cursor, @success_blocks = thread_state if thread_state
       nil
     end
       
@@ -71,16 +61,12 @@ module Cannonbol
    
   class Pattern < Array
     
-    def initialize(pattern = nil)
-      @pattern = pattern
-    end
-    
     def to_s
       "#{self.class.name}#{super}"
     end
     
-    def match?(s, anchor = nil)
-      Needle.new(s).thread(self, anchor)
+    def match?(s, opts = {})
+      Needle.new(s).thread(self, opts)
     end
     
     def _match?(needle)
@@ -94,37 +80,9 @@ module Cannonbol
     def &(pattern)
       Concat.new(self, pattern)
     end
-    
+
     def on_success(&block)
       OnSuccess.new(self, &block)
-    end
-    
-    def rem
-      Cannonbol::Rem.new(self)
-    end
-    
-    def arb
-      Cannonbol::Arb.new(self)
-    end
-    
-    def len(l=nil, &block)
-      Cannonbol::Len.new(self, l, &block)
-    end
-    
-    def pos(p=nil, &block)
-      Cannonbol::Pos.new(self, p, &block)
-    end  
-    
-    def rpos(p=nil, &block)
-      Cannonbol::RPos.new(self, p, &block)
-    end  
-    
-    def tab(p=nil, &block)
-      Cannonbol::Tab.new(self, p, &block)
-    end
-    
-    def rtab(p=nil, &block)
-      Cannonbol::RTab.new(self, p, &block)
     end
       
   end
@@ -185,13 +143,12 @@ module Cannonbol
       @block = block
     end
     
-    def _match?(needle, thread_state = nil)
-      starting_cursor = needle.cursor
-      if thread_state
-        needle.pull(thread_state)
-      elsif @pattern._match?(needle)
+    def _match?(needle, thread_state = nil, starting_cursor = nil, s=[])
+      needle.pull(thread_state)
+      starting_cursor ||= needle.cursor
+      if s = @pattern._match?(needle, *s)
         ending_cursor = needle.cursor-1
-        [ needle.push(0) { @block.call(needle.string[starting_cursor..ending_cursor]) } ]
+        [ needle.push(0) { @block.call(needle.string[starting_cursor..ending_cursor]) }, starting_cursor, s ]
       end
     end
     
@@ -202,7 +159,7 @@ module Cannonbol
     def _match?(needle, thread_state = nil)
       if thread_state
         needle_pull(thread_state)
-      elsif @pattern._match?(needle)
+      else
         [needle.push(needle.string.length-needle.cursor)]
       end 
     end
@@ -213,82 +170,182 @@ module Cannonbol
     
     def _match?(needle, match_length = 0, thread_state = nil)
       needle.pull(thread_state)
-      while needle.remaining_string.length >= match_length 
+      if needle.remaining_string.length >= match_length 
         thread_state = needle.push(match_length)
         match_length += 1
-        return [match_length, thread_state] if @pattern._match?(needle) 
-        needle.pull(thread_state)
+        [match_length, thread_state]
       end
     end
     
   end
   
-  class Len < Pattern
+  class ParameterizedPattern < Pattern
     
-    def initialize(pattern, len = nil, &block)
-      @pattern = pattern
+    def initialize(param = nil, &block)
+      @param = param
       @block = block
-      @len = len
-    end 
+    end
+    
+    def self.parameter(name, &post_processor)
+      @post_processor = post_processor
+      define_method(name) do 
+        val = @block ? @block.call : @param
+        val = post_processor.call(val) if @post_processor
+        val
+      end
+    end
+    
+  end
+  
+  class Len < ParameterizedPattern
+    
+    parameter :len
     
     def _match?(needle, thread_state = nil)
+
       if thread_state
         needle.pull(thread_state)
       else
-        len = @block ? @block.call : @len
-        [needle.push(len)] if needle.remaining_string.length >= len and @pattern._match?(needle)
+        len_temp = len
+        [needle.push(len_temp)] if needle.remaining_string.length >= len_temp
       end
+      
     end
     
   end
   
-  class Pos < Pattern
+  class Pos < ParameterizedPattern
     
-    def initialize(pattern, pos = nil, &block)
-      @pattern = pattern
-      @block = block
-      @pos = pos
-    end 
+    parameter :pos
     
     def _match?(needle, matched = nil)
-      return (needle.cursor == (@block ? @block.call : @pos) and @pattern._match?(needle)) unless matched
+      return [true] if needle.cursor == pos and !matched
     end 
     
   end 
   
-  class RPos < Pos
+  class RPos < ParameterizedPattern
+    
+    parameter :pos
     
     def _match?(needle, matched = nil)
-      return (needle.string.length-needle.cursor == (@block ? @block.call : @pos) and @pattern._match?(needle)) unless matched
+      return [true] if needle.string.length-needle.cursor == pos and !matched
     end 
     
   end
   
-  class Tab < Pos
+  class Tab < ParameterizedPattern
+    
+    parameter :pos
     
     def _match?(needle, thread_state = nil)
+      
       if thread_state
         needle.pull(thread_state)
       else
-        len = (@block ? @block.call : @pos) - needle.cursor
-        [needle.push(len)] if len > 0 and needle.remaining_string.length >= len and @pattern._match?(needle)
+        len = pos - needle.cursor
+        [needle.push(len)] if len > 0 and needle.remaining_string.length >= len 
       end
     end
     
   end
   
-  class RTab < Pos
+  class RTab < ParameterizedPattern
+    
+    parameter :pos
     
     def _match?(needle, thread_state = nil)
       if thread_state
         needle.pull(thread_state)
       else
-        len = (needle.remaining_string.length - (@block ? @block.call : @pos)) - needle.cursor
-        [needle.push(len)] if len > 0 and needle.remaining_string.length >= len and @pattern._match?(needle)
+        len = (needle.remaining_string.length - pos) 
+        [needle.push(len)] if len >= 0 and needle.remaining_string.length >= len
       end
     end
     
   end
+  
+  class Any < ParameterizedPattern
+    
+    parameter :chars, &:split
+    
+    def _match?(needle, thread_state = nil)
+      if thread_state
+        needle.pull(thread_state)
+      elsif chars.include? needle.remaining_string[0..0]
+        [needle.push(1)]
+      end
+    end
+    
+  end
+  
+  class NotAny < ParameterizedPattern
+    
+    parameter :chars, &:split
+    
+    def _match?(needle, thread_state = nil)
+      if thread_state
+        needle.pull(thread_state)
+      elsif !(chars.include? needle.remaining_string[0..0])
+        [needle.push(1)]
+      end
+    end
+    
+  end  
+  
+  class Span < ParameterizedPattern
+    
+    parameter :chars, &:split
+    
+    def _match?(needle, match_length = nil, thread_state = nil)
+      unless match_length
+        the_chars, match_length = chars, 0
+        while needle.remaining_string.length > match_length and the_chars.include? needle.remaining_string[match_length..match_length]
+          match_length += 1
+        end 
+      end
+      needle.pull(thread_state)
+      if match_length > 0 
+        thread_state = needle.push(match_length)
+        match_length -= 1
+        [match_length, thread_state]
+      end
+    end
+  end
+  
+  class Break < ParameterizedPattern
+    
+    parameter :chars, &:split
+    
+    def _match?(needle, thread_state = nil)
+      if thread_state
+        needle.pull(thread_state)
+      else
+        the_chars, len = chars, 0
+        while needle.remaining_string.length > len and !(the_chars.include? needle.remaining_string[len..len])
+          len += 1
+        end 
+        [needle.push(len)]
+      end 
+    end 
+    
+  end 
+
+  
+  class BreakX < ParameterizedPattern
+    
+    parameter :chars, &:split
+    
+    def _match?(needle, len = 0, thread_state = nil)
+      needle.pull(thread_state)
+      the_chars = chars
+      while needle.remaining_string.length > len and !(the_chars.include? needle.remaining_string[len..len])
+        len += 1
+      end 
+      [len+1, needle.push(len)] if needle.remaining_string.length >= len
+    end 
+    
+  end   
   
 end
 
@@ -306,36 +363,8 @@ class String
     Cannonbol::OnSuccess.new(self, &block)
   end
   
-  def rem
-    Cannonbol::Rem.new(self)
-  end
-  
-  def arb
-    Cannonbol::Arb.new(self)
-  end
-    
-  def len(l=nil, &block)
-    Cannonbol::Len.new(self, l, &block)
-  end
-  
-  def pos(p=nil, &block)
-    Cannonbol::Pos.new(self, p, &block)
-  end  
-  
-  def rpos(p=nil, &block)
-    Cannonbol::RPos.new(self, p, &block)
-  end  
-  
-  def tab(p=nil, &block)
-    Cannonbol::Tab.new(self, p, &block)
-  end
-  
-  def rtab(p=nil, &block)
-    Cannonbol::RTab.new(self, p, &block)
-  end
-  
-  def match?(s, anchor = nil)
-    Cannonbol::Needle.new(s).thread(self, anchor)
+  def match?(s, opts = {})
+    Cannonbol::Needle.new(s).thread(self, opts)
   end
   
   def _match?(needle, thread_state = nil)
@@ -345,5 +374,54 @@ class String
       [needle.push(self.length)]
     end
   end
+  
+end
+
+
+class Object
+    
+  REM = Cannonbol::Rem.new
+  
+  ARB = Cannonbol::Arb.new
+  
+  def LEN(p=nil, &block)
+    Cannonbol::Len.new(p, &block)
+  end
+  
+  def POS(p=nil, &block)
+    Cannonbol::Pos.new(p, &block)
+  end  
+  
+  def RPOS(p=nil, &block)
+    Cannonbol::RPos.new(p, &block)
+  end  
+  
+  def TAB(p=nil, &block)
+    Cannonbol::Tab.new(p, &block)
+  end
+  
+  def RTAB(p=nil, &block)
+    Cannonbol::RTab.new(p, &block)
+  end
+  
+  def ANY(p=nil, &block)
+    Cannonbol::Any.new(p, &block)
+  end 
+  
+  def NOTANY(p=nil, &block)
+    Cannonbol::NotAny.new(p, &block)
+  end
+    
+  def SPAN(p=nil, &block)
+    Cannonbol::Span.new(p, &block)
+  end
+     
+  def BREAK(p=nil, &block)
+    Cannonbol::Break.new(p, &block)
+  end 
+  
+  def BREAKX(p=nil, &block)
+    Cannonbol::BreakX.new(p, &block)
+  end 
   
 end
