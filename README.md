@@ -1,6 +1,11 @@
 # Cannonbol
 
-Cannonbol is a ruby dsl for patten matching based on SNOBOL4 and SPITBOL
+Cannonbol is a ruby dsl for patten matching based on SNOBOL4 and SPITBOL.
+Makes complex patterns easier to read and write!
+Allows recursive patterns!
+Complete SNOBOL4 + SPITBOL extensions!
+Simple syntax looks great alongside ruby!
+
 
 ## Installation
 
@@ -18,9 +23,62 @@ Or install it yourself as:
 
     $ gem install cannonbol
 
-## Usage
+## Lets Go!
 
-TODO: Write usage instructions here
+### Basic Matching `- &, |, capture?, match_any, match_all`
+
+Here is a simple pattern that matches a simple noun clause:
+
+    ("a" | "the") & /\s+/ & ("boy" | "girl")
+    
+So we will match either "a" or "the" followed white spae and then by "boy or "girl".  Okay!  Lets use it!
+
+    ("a" | "the") & /\s+/ & ("boy" | "girl").match?("he saw a boy going home")
+    => "a boy"
+    ("a" | "the") & /\s+/ & ("boy" | "girl").match?("he saw a big boy going home")
+    => nil
+
+Notice that we can use regexes or strings as pattern primitives.
+
+Let's save the pieces of the match using the capture? method:
+
+    article, noun = nil, nil
+    pattern = ("a" | "the").capture? { |m| article = m } & /\s+/ & ("boy" | "girl").capture? { |m| noun = m }
+    pattern.match?("he saw the girl going home")
+    noun
+    => girl
+    article
+    => the
+
+You can also turn an array into a pattern using the match_any or match_all methods:
+
+    ARTICLES = ["a", "the"]
+    NOUNS = ["boy", "girl", "dog", "cat"]
+    ADJECTIVES = ["big", "small", "fierce", "friendly"]
+    SPACE = /\s+/
+    [ARTICLES.match_any, [SPACE, [SPACE, ADJECTIVES.match_any, SPACE].match_all].match_any, NOUNS.match_any].match_all
+    
+is equivilent to 
+   
+    ("a" | "the") & (SPACE | (SPACE & ("big" | "small" | "fierce" | "friendly") & SPACE)) & ("boy" | "girl" | "dog" | "cat")
+    
+
+   
+
+
+
+There is a related method `capture!` The difference is when the methods are
+called.  `capture?` (read as capture IF) is called once the match succeeds with the final value matched by its pattern.  
+`capture!` (read as capture NOW) is called as soon as the pattern component matches.  
+
+For example:
+
+    words = []
+    gather_words = MATCH {\[A-Za-z]+\
+
+
+
+
 
 ## Development
 
