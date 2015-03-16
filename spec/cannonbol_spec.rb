@@ -112,7 +112,7 @@ describe Cannonbol do
   end
   
   it 'can replace the match with a fixed value' do
-    expect('hello'.match?("she said hello", replace_with: "goodby")).to eq("she said goodby")
+    expect('hello'.match?("she said hello", replace_match_with: "goodby")).to eq("she said goodby")
   end 
   
   it 'can replace the match using a block' do
@@ -213,9 +213,9 @@ describe Cannonbol do
   
   it 'can match a palindrome rev 2' do
     palindrome = MATCH do | ; c|
-      /\s*/ & LEN(1).capture! { |m| c = m } & /\s*/ & ( palindrome | LEN(1) | LEN(0)) & /\s*/ & MATCH { c } & /\s*/ 
+      /\W*/ & LEN(1).capture! { |m| c = m } & /\W*/ & ( palindrome | LEN(1) | LEN(0)) & /\W*/ & MATCH { c } 
     end 
-    expect(palindrome.match?("a man a plan a canal panama")).to be_truthy
+    expect(palindrome.match?("A man, a plan, a canal Panama!", ignore_case: true)).to be_truthy
     expect(palindrome.match?("palindrome")).to be_falsy    
   end 
   
@@ -285,5 +285,55 @@ describe Cannonbol do
     pattern.match?("abcd")
     expect(matches).to eq(['a', 'ab', 'abc', 'abcd'])
   end
+  
+  it "has an 'ignore case' operator" do
+    expect((-"boy").match?("Boy")).to be_truthy
+    expect((-("boy" | "girl")).match?("A big Girl!")).to be_truthy
+    expect(("boy" | -"GIRL").match?("A big girl!")).to be_truthy
+    expect(("boy" | -"GIRL").match?("A big BOY!")).to be_falsy
+    expect(("boy" | "girl").match?("Its a BOY!", ignore_case: true)).to be_truthy
+    expect(/XYZZY/i.match?("xyZZy")).to be_truthy
+    expect((-/XYZZY/).match?("xyZZy")).to be_truthy
+    expect(/XYZZY/.match?("xyZZy", ignore_case: true)).to be_truthy
+    expect(/XYZZY/.match?("xyZZy", ignore_case: false)).to be_falsy
+  end
+  
+  it "has a match_any array operator" do
+    expect(["boy", "girl"].match_any.match?("You just had a BOY!", ignore_case: true)).to eq("BOY")
+  end
+  
+  it "has a match_all array operator" do
+    expect(["boy", ARB, "girl"].match_all.match?("I have three boys and one girl.")).to eq("boys and one girl")
+  end
+  
+  it 'works for all the readme examples' do
+   
+    expect((("a" | "the") & /\s+/ & ("boy" | "girl")).match?("he saw a boy going home")).to eq("a boy")
+    expect((("a" | "the") & /\s*/ & /\w*/ & /\s*/ & ("boy" | "girl")).match?("he saw a big boy going home")).to eq("a big boy")
+    article, noun = nil, nil
+    pattern = ("a" | "the").capture? { |m| article = m } & /\s+/ & ("boy" | "girl").capture? { |m| noun = m }
+    pattern.match?("he saw the girl going home") 
+    expect(article).to eq("the")
+    expect(noun).to eq("girl")
+    ARTICLES = ["a", "the"]
+    NOUNS = ["boy", "girl", "dog", "cat"]
+    ADJECTIVES = ["big", "small", "fierce", "friendly"]
+    SPACE = /\s+/
+    pattern = [ARTICLES.match_any, [SPACE, [SPACE, ADJECTIVES.match_any, SPACE].match_all].match_any, NOUNS.match_any].match_all
+    expect(pattern.match?("He was bit by the fierce dog!")).to eq("the fierce dog")
+    pattern = ("a" | "the") & (SPACE | (SPACE & ("big" | "small" |"fierce"  |"friendly") & SPACE)) & ("boy" | "girl" | "dog" | "cat")
+    expect(pattern.match?("He was bit by the fierce girl!")).to eq("the fierce girl")
+    pattern = POS(0) & /\w+/ & ARBNO(/\s*,\s*/ & /\w+/) & /\s*/ & RPOS(0)
+    expect(pattern.match?("item1, another, big, small")).to be_truthy
+    expect(pattern.match?("item1 & item2")).to be_falsy
+    def parse(s, *widths)
+      fields = []
+      (ARBNO(LEN {widths.shift}.capture? {|field| fields << field.strip}) & RPOS(0)).match?(s)
+      fields
+    end
+    #            "123451231234123456"
+    expect(parse("boy  batcat   tree",5,3,4,6)).to eq(["boy","bat", "cat", "tree"])
+  end
+
 
 end

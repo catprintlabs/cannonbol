@@ -33,6 +33,7 @@ module Cannonbol
     attr_reader :string
     attr_accessor :captures
     attr_accessor :match_failed
+    attr_accessor :ignore_case
     
     def initialize(string)
       @string = string
@@ -42,7 +43,8 @@ module Cannonbol
       @captures = {}
       anchor = opts[:anchor]
       raise_error = opts[:raise_error]
-      replace_with = opts[:replace_with]
+      replace_with = opts[:replace_match_with]
+      ignore_case = opts[:ignore_case]
       @cursor = -1
       match = nil
       begin
@@ -50,6 +52,7 @@ module Cannonbol
           @cursor += 1
           @starting_character = nil
           @success_blocks = []
+          @ignore_case = ignore_case
           match = pattern._match?(self)
           break if anchor and !match 
         end
@@ -80,7 +83,7 @@ module Cannonbol
     end
      
     def push(length, &success_block)
-      thread_state = [@starting_character, @cursor, @success_blocks.dup]
+      thread_state = [@starting_character, @cursor, @success_blocks.dup, @ignore_case]
       @starting_character ||= @cursor
       @cursor += length
       @success_blocks << success_block if success_block
@@ -88,7 +91,7 @@ module Cannonbol
     end
       
     def pull(thread_state)
-      @starting_character, @cursor, @success_blocks = thread_state if thread_state
+      @starting_character, @cursor, @success_blocks, @ignore_case = thread_state if thread_state
       nil
     end
       
@@ -112,6 +115,10 @@ module Cannonbol
     def &(pattern)
       Concat.new(self, pattern)
     end
+    
+    def -@
+      CaseSensitiveOff.new(self)
+    end 
 
     def capture?(opts = {}, &block)
       OnSuccess.new(self, opts, &block)
@@ -182,6 +189,22 @@ module Cannonbol
     
     def |(p2)
       Choose.new(self, p2)
+    end
+    
+  end
+  
+  class CaseSensitiveOff < Pattern
+    
+    def initialize(pattern)
+      @pattern = pattern
+    end 
+    
+    def __match?(needle, thread=nil, s=[])
+      needle.pull(thread)
+      thread = needle.push(0)
+      needle.ignore_case = true
+      s = @pattern._match?(needle, *s)
+      return [thread, s] if s
     end
     
   end
@@ -539,7 +562,9 @@ class String
   def __match?(needle, thread_state = nil)
     if thread_state
       needle.pull(thread_state)
-    elsif self.length == 0 or needle.remaining_string[0..self.length-1] == self
+    elsif self.length == 0 or 
+          (!needle.ignore_case and needle.remaining_string[0..self.length-1] == self) or 
+          (needle.ignore_case and needle.remaining_string[0..self.length-1].upcase == self.upcase)
       [needle.push(self.length)]
     end
   end
@@ -551,7 +576,7 @@ class Regexp
   include Cannonbol::Operators
   
   def __match?(needle, thread_state = nil)
-    @cannonbol_regex ||= Regexp.new("^#{self.source}", self.options)
+    @cannonbol_regex ||= Regexp.new("^#{self.source}", self.options | (needle.ignore_case ? Regexp::IGNORECASE : 0) )
     if thread_state
       needle.pull(thread_state)
     elsif m = @cannonbol_regex.match(needle.remaining_string)
@@ -560,6 +585,23 @@ class Regexp
   end
   
 end
+
+module Enumerable
+  
+  def match_any
+    if self.first 
+      self[1..-1].inject(self.first) { |memo, item| memo | item }
+    else
+      FAIL
+    end
+  end 
+  
+  def match_all
+    self.inject("") { |memo, item| memo & item }
+  end 
+  
+end
+  
 
 class Object
     
