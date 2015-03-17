@@ -10,11 +10,18 @@ Gem::Specification.new do |spec|
   spec.email         = ["mitch@catprint.com"]
 
   if spec.respond_to?(:metadata)
-    #spec.metadata['allowed_push_host'] = "TODO: Set to 'http://mygemserver.com' to prevent pushes to rubygems.org, or delete to allow pushes to any server."
   end
 
   spec.summary       = %q{Cannonbol is a ruby dsl for patten matching based on SNOBOL4 and SPITBOL}
-  spec.description   = %q{TODO: Write a longer description or delete this line.}
+  spec.description   = %q{
+Makes complex patterns easier to read and write!
+Combine regexes, plain strings and powerful new primitive match functions!
+Makes capturing match results easy!
+Allows recursive patterns!
+Complete SNOBOL4 + SPITBOL extensions!
+Based on the well documented, proven SNOBOL4 language!
+Simple syntax looks great alongside ruby!
+                       }
   spec.homepage      = "https://github.com/catprintlabs/cannonbol"
   spec.license       = "MIT"
 
