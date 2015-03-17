@@ -339,6 +339,14 @@ describe Cannonbol do
     end
     #            "123451231234123456"
     expect(parse("boy  batcat   tree",5,3,4,6)).to eq(["boy","bat", "cat", "tree"])
+    pet_survey = 
+      (POS(0) & ARBNO(("big" | "small").capture?(:size) | ("dog" | "cat").capture?(:pet) | LEN(1)) & RPOS(0)).match?("He has a big dog!", raise_error: true) do |m, pet, size| 
+        "type of pet: #{pet.upcase}, size: #{size.upcase}"
+      end
+    
+    expect(pet_survey).to eq("type of pet: DOG, size: BIG")
+    count_i =  ("i".capture! { |m, p| puts "i found at #{p-1}"} & RPOS(0)).match?("I said hello!", ignore_case: true)
+    
   end
 
 
