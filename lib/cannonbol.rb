@@ -14,7 +14,7 @@ module Cannonbol
       @cannonbol_string = string
       @match_start = match_start
       @match_end = match_end
-      @captured = captured
+      @captured = captured.dup
       super(@match_end < 0 ? "" : string[@match_start..@match_end])
     end 
     
@@ -59,8 +59,8 @@ module Cannonbol
       rescue MatchFailed
       end
       if match
-        match = MatchString.new(@string, @starting_character || @cursor, @cursor-1, @captures)
         @success_blocks.each(&:call)
+        match = MatchString.new(@string, @starting_character || @cursor, @cursor-1, @captures)
       else
         raise MatchFailed if raise_error
       end
@@ -159,14 +159,6 @@ module Cannonbol
       self << p1 << p2
     end
     
-    def |(p2)
-      self << p2
-    end
-    
-    def &(p2)
-      Concat.new(self, p2)
-    end
-    
   end
   
   class Concat < Pattern
@@ -181,14 +173,6 @@ module Cannonbol
     
     def initialize(p1, p2)
       self << p1 << p2
-    end
-    
-    def &(p2)
-      self << p2
-    end
-    
-    def |(p2)
-      Choose.new(self, p2)
     end
     
   end
@@ -230,9 +214,13 @@ module Cannonbol
       if s = @pattern._match?(needle, *s)
         ending_cursor = needle.cursor-1
         push = needle.push(0) do
-          match_string = ending_cursor < 0 ? "" : needle.string[starting_cursor..ending_cursor]
+          match_string = MatchString.new(needle.string, starting_cursor, ending_cursor, needle.captures)
           capture_value = @capture_name && (needle.captures.has_key?(@capture_name) ? needle.captures[@capture_name] : @initial_capture_value) 
-          match_string = @block.call(match_string, ending_cursor+1, capture_value) if @block
+          if @block
+            match_string = @block.call(match_string, ending_cursor+1, capture_value) 
+          elsif capture_value.class == Array
+            match_string = capture_value + [match_string]
+          end
           needle.capture(@capture_name, match_string)
         end
         [ push, starting_cursor, s ]
@@ -246,7 +234,7 @@ module Cannonbol
     def __match?(needle, starting_cursor = nil, s=[])
       starting_cursor ||= needle.cursor
       if s = @pattern._match?(needle, *s)
-        match_string = needle.cursor == 0 ? "" : needle.string[starting_cursor..needle.cursor-1]
+        match_string = MatchString.new(needle.string, starting_cursor, needle.cursor-1, needle.captures)
         capture_value = @capture_name && (needle.captures.has_key?(@capture_name) ? needle.captures[@capture_name] : @initial_capture_value) 
         match_string = @block.call(match_string, needle.cursor, capture_value) if @block
         needle.capture(@capture_name, match_string)
@@ -492,19 +480,23 @@ module Cannonbol
   
   class Arbno < Match
     
-    def __match?(needle, last_match = [])
-      return unless last_match
-      if @block
-        pattern = @block.call
-      elsif @name
-        pattern = needle.captures[@name] || ""
+    def __match?(needle, pattern = nil, s = [[]])
+      return if s.length == 0
+      if pattern
+        existing_captures = needle.captures.dup
+        s[-1] = pattern._match?(needle, *(s.last))
+        s = s[-1] ? s + [[]] : s[0..-2]
+        needle.captures = needle.captures.merge(existing_captures)
       else
-        pattern = @pattern
+        if @block
+          pattern = @block.call
+        elsif @name
+          pattern = needle.captures[@name] || ""
+        else
+          pattern = @pattern
+        end
       end
-      existing_captures = needle.captures.dup
-      s = pattern._match?(needle)
-      needle.captures = needle.captures.merge(existing_captures)
-      [s]
+      [pattern, s]
     end 
     
   end

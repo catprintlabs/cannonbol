@@ -306,6 +306,12 @@ describe Cannonbol do
     expect(["boy", ARB, "girl"].match_all.match?("I have three boys and one girl.")).to eq("boys and one girl")
   end
   
+  it "ARBNO will backtrack through a SPAN" do
+    chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ@"
+    pattern = POS(0) & SPAN(chars) & "." & ARBNO(SPAN(chars)) & "@" & SPAN(chars) & RPOS(0)
+    expect(pattern.match?("XY.ZZY@HELLO", ignore_case: true)).to be_truthy
+  end
+  
   it 'works for all the readme examples' do
    
     expect((("a" | "the") & /\s+/ & ("boy" | "girl")).match?("he saw a boy going home")).to eq("a boy")
