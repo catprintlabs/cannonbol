@@ -345,7 +345,6 @@ describe Cannonbol do
       end
     
     expect(pet_survey).to eq("type of pet: DOG, size: BIG")
-    count_i =  ("i".capture! { |m, p| puts "i found at #{p-1}"} & RPOS(0)).match?("I said hello!", ignore_case: true)
     
   end
 
