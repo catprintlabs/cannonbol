@@ -1,5 +1,3 @@
-require "cannonbol/version"
-
 module Cannonbol
   
   class MatchFailed < Exception; end
@@ -19,10 +17,10 @@ module Cannonbol
     end 
     
     def replace_match_with(s)
-      @cannonbol_string.dup.tap do |new_s| 
-        new_s[@match_start..@match_end] = "" if @match_end >= 0
-        new_s.insert(@match_start, s)
-      end 
+      before_match = ""
+      before_match = @cannonbol_string[0..@match_start-1] if @match_start > 0
+      after_match = @cannonbol_string[@match_end+1..-1] || ""
+      before_match + s + after_match
     end
     
   end
@@ -54,7 +52,7 @@ module Cannonbol
           @success_blocks = []
           @ignore_case = ignore_case
           match = pattern._match?(self)
-          break if anchor and !match 
+          break if !match and anchor  
         end
       rescue MatchFailed
       end
@@ -130,13 +128,9 @@ module Cannonbol
     
   end
    
-  class Pattern < Array
+  class Pattern 
     
     include Operators
-    
-    def to_s
-      "#{self.class.name}[#{self.collect(&:to_s).join(', ')}]"
-    end
     
     def __match?(needle)
       []
@@ -147,16 +141,17 @@ module Cannonbol
   class Choose < Pattern
     
     def __match?(needle, i = 0, s = [])
-      while i < self.length
-        s = self[i]._match?(needle, *s)
+      while i < @params.length
+        s = @params[i]._match?(needle, *s)
         return [i, s] if s
         s = []
         i += 1
       end
+      nil
     end
     
     def initialize(p1, p2)
-      self << p1 << p2
+      @params = [p1, p2]
     end
     
   end
@@ -164,15 +159,15 @@ module Cannonbol
   class Concat < Pattern
     
     def __match?(needle, i = 0, s = [])
-      while i < self.length and i >= 0
-        s[i] = self[i]._match?(needle, *(s[i] || []))
+      while i < @params.length and i >= 0
+        s[i] = @params[i]._match?(needle, *(s[i] || []))
         i = s[i] ? i+1 : i-1
       end
-      [i-1, s] if i == self.length
+      [i-1, s] if i == @params.length
     end
     
     def initialize(p1, p2)
-      self << p1 << p2
+      @params = [p1, p2]
     end
     
   end
@@ -311,7 +306,6 @@ module Cannonbol
         @initial_param_value = opts
       end
       @block = block
-      self << @param << @block
     end
     
     def self.parameter(name, &post_processor)
@@ -568,13 +562,33 @@ class Regexp
   include Cannonbol::Operators
   
   def __match?(needle, thread_state = nil)
-    @cannonbol_regex ||= Regexp.new("^#{self.source}", self.options | (needle.ignore_case ? Regexp::IGNORECASE : 0) )
+    if defined? Opal
+      options = ""
+      options += "m" if `#{self}.multiline`
+      options += "g" if `#{self}.global`
+      options += "i" if needle.ignore_case or `#{self}.ignoreCase`
+    else
+      options = self.options | (needle.ignore_case ? Regexp::IGNORECASE : 0)
+    end
+    @cannonbol_regex ||= Regexp.new("^#{self.source}", options )
     if thread_state
       needle.pull(thread_state)
     elsif m = @cannonbol_regex.match(needle.remaining_string)
       [needle.push(m[0].length)]
     end
   end
+  
+end
+
+if defined? Opal
+  
+  class Proc
+    
+    def parameters
+      /.*function[^(]*\(([^)]*)\)/.match(`#{self}.toString()`)[1].split(",").collect { |param| [:req, param.strip.to_sym]}
+    end
+    
+  end 
   
 end
 

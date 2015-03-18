@@ -212,7 +212,7 @@ describe Cannonbol do
   end
   
   it 'can match a palindrome rev 2' do
-    palindrome = MATCH do | ; c|
+    palindrome = MATCH do | c |  # can't do | ; c | in Opal
       /\W*/ & LEN(1).capture! { |m| c = m } & /\W*/ & ( palindrome | LEN(1) | LEN(0)) & /\W*/ & MATCH { c } 
     end 
     expect(palindrome.match?("A man, a plan, a canal Panama!", ignore_case: true)).to be_truthy
@@ -255,7 +255,7 @@ describe Cannonbol do
     
   it "has a FAIL primitive pattern" do
     some_chars = ""
-    ( LEN(1).capture! { |char| some_chars << char } & FAIL ).match?("hello world")
+    ( LEN(1).capture! { |char| some_chars += char } & FAIL ).match?("hello world")
     expect(some_chars).to eq("hello world")
   end
   

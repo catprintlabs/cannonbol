@@ -5,7 +5,7 @@ describe "an email address parser" do
   before(:all) do
     ws             = /\s*/
     quoted_string  = ws & '"' & ARBNO(NOTANY('"\\') | '\\"' | '\\\n' | '\\\\') & '"' & ws
-    atom           = ws & SPAN("!#$%&'*+-/0123456789=?@ABCDEFGHIJKLMNOPQRSTUVWXYZ^_`abcdefghijklmnopqrstuvwxyz{|}~") & ws
+    atom           = ws & SPAN("\!\#\$\%\&\'\*\+\-/0123456789=?@ABCDEFGHIJKLMNOPQRSTUVWXYZ^_`abcdefghijklmnopqrstuvwxyz{|}~") & ws
     word           = (atom | quoted_string)
     phrase         = word & ARBNO(word)
     domain_ref     = atom 
@@ -18,7 +18,7 @@ describe "an email address parser" do
     route_addr     = "<" & ((route | "") & addr_spec).capture?(:mailbox) { |m| m.strip } & ">"
     mailbox        = (addr_spec.capture?(:mailbox) { |m| m.strip } | (phrase.capture?(:display_name) { |m| m.strip } & route_addr))  
     group          = (phrase.capture?(:group_name) { |m| m.strip } & ":" &
-                     (( mailbox.capture?(group_mailboxes: []) & ARBNO("," & mailbox.capture?(:group_mailboxes) ) ) | ws)) & ";"
+                    (( mailbox.capture?(group_mailboxes: []) & ARBNO("," & mailbox.capture?(:group_mailboxes) ) ) | ws)) & ";"
     @address       = POS(0) & (mailbox | group ) & RPOS(0)
   end
      
@@ -34,7 +34,14 @@ describe "an email address parser" do
   
   it "matches a simple address" do
     address = 'fred@catprint.com'
-    @address.match?(address) do |m, group_name, group_mailboxes, display_name, mailbox, local_part, domain|
+    @address.match?(address) do |
+        m, 
+        group_name, 
+        group_mailboxes, 
+        display_name, 
+        mailbox, 
+        local_part, 
+        domain |
       expect(m).to be_truthy
       expect(group_name).to be_falsy
       expect(group_mailboxes).to be_falsy
@@ -47,7 +54,14 @@ describe "an email address parser" do
   
   it "matches an address with a display_name" do
     address = 'Fred Nurph <fred@catprint.com>'
-    @address.match?(address) do |m, group_name, group_mailboxes, display_name, mailbox, local_part, domain|
+    @address.match?(address) do |
+        m, 
+        group_name, 
+        group_mailboxes, 
+        display_name, 
+        mailbox, 
+        local_part, 
+        domain |
       expect(m).to be_truthy
       expect(group_name).to be_falsy
       expect(group_mailboxes).to be_falsy
