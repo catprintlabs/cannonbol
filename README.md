@@ -4,11 +4,11 @@ CannonBol is a ruby DSL for patten matching based on SNOBOL4 and SPITBOL.
 
 * Makes complex patterns easier to read and write!
 * Combine regexes, plain strings and powerful new primitive match functions!
-* Makes capturing match results easy!
+* Makes capturing match results simple!
 * Allows recursive patterns!
 * Complete SNOBOL4 + SPITBOL extensions!
 * Based on the well documented, proven SNOBOL4 language!
-* Simple syntax looks great alongside ruby!
+* Simple syntax looks great within your ruby code!
 
 ## Installation
 
@@ -30,7 +30,7 @@ Or install it yourself as:
 
 ### Basic Matching `- &, |, capture?, match_any, match_all`
 
-Strings, Regexes and primitives are combined using & (concatenation) and | (alternation) operators
+Strings, Regexes and primitives are combined using & (concatenation) and | (alternation) operators.  Once the gem is installed you are good to go.
 
 Here is a simple pattern that matches a simple noun clause:
 
