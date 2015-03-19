@@ -33,4 +33,7 @@ Simple syntax looks great alongside ruby!
   spec.add_development_dependency "bundler", "~> 1.8"
   spec.add_development_dependency "rake", "~> 10.0"
   spec.add_development_dependency "rspec"
+  spec.add_development_dependency "opal-rspec"
+  spec.add_development_dependency "opal"
+  spec.required_ruby_version = '~> 1.9'
 end

@@ -289,8 +289,8 @@ describe Cannonbol do
   it "has an 'ignore case' operator" do
     expect((-"boy").match?("Boy")).to be_truthy
     expect((-("boy" | "girl")).match?("A big Girl!")).to be_truthy
-    expect(("boy" | -"GIRL").match?("A big girl!")).to be_truthy
-    expect(("boy" | -"GIRL").match?("A big BOY!")).to be_falsy
+    expect((-"GIRL" | "boy").match?("A big girl!")).to be_truthy
+    expect((-"GIRL" | "boy").match?("A big BOY!")).to be_falsy
     expect(("boy" | "girl").match?("Its a BOY!", ignore_case: true)).to be_truthy
     expect(/XYZZY/i.match?("xyZZy")).to be_truthy
     expect((-/XYZZY/).match?("xyZZy")).to be_truthy

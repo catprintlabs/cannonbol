@@ -9,6 +9,7 @@ CannonBol is a ruby DSL for patten matching based on SNOBOL4 and SPITBOL.
 * Complete SNOBOL4 + SPITBOL extensions!
 * Based on the well documented, proven SNOBOL4 language!
 * Simple syntax looks great within your ruby code!
+* Tested with ruby 1.9.3, 2.1.1 and [Opal](www.opalrb.org)
 
 ## Installation
 
@@ -34,28 +35,31 @@ Strings, Regexes and primitives are combined using & (concatenation) and | (alte
 
 Here is a simple pattern that matches a simple noun clause:
 
-    ("a" | "the") & /\s+/ & ("boy" | "girl")
+    > ("a" | "the") & /\s+/ & ("boy" | "girl")
     
-So we will match either "a" or "the" followed white space and then by "boy or "girl".  Okay!  Lets use it!
+This will match either "a" or "the" followed white space and then by "boy or "girl".  Okay!  Lets use it!
 
-    ("a" | "the") & /\s+/ & ("boy" | "girl").match?("he saw a boy going home")
+    > ("a" | "the") & /\s+/ & ("boy" | "girl").match?("he saw a boy going home")
     => "a boy"
-    ("a" | "the") & /\s+/ & ("boy" | "girl").match?("he saw a big boy going home")
+    > ("a" | "the") & /\s+/ & ("boy" | "girl").match?("he saw a big boy going home")
     => nil
 
-Now let's save the pieces of the match using the capture? (pronounced _capture IF_) method:
+Now let's save the pieces of the match using the `capture?` (pronounced _capture IF_) method:
 
-    article, noun = nil, nil
-    pattern = ("a" | "the").capture? { |m| article = m } & /\s+/ & ("boy" | "girl").capture? { |m| noun = m }
-    pattern.match?("he saw the girl going home")
-    noun
+    > article, noun = nil, nil;
+    * pattern = ("a" | "the").capture? { |m| article = m } & /\s+/ & ("boy" | "girl").capture? { |m| noun = m };
+    * pattern.match?("he saw the girl going home")
+    => the girl
+    > noun
     => girl
-    article
+    > article
     => the
 
-The capture? method and its friend capture! (pronounced _capture NOW_) have many powerful features. As shown above it can take a block which is passed the matching substring, _IF the match succeeds_.  The other features of the capture method will be detailed [below.](Advanced capture techniques)
+The `capture?` method and its friend `capture!` (pronounced _capture NOW_) have many powerful features. 
+As shown above it can take a block which is passed the matching substring, _IF the match succeeds_.  
+The other features of the capture method will be detailed [below.](Advanced capture techniques)
 
-Arrays can be turned into patterns using the match_any and match_all methods:
+Arrays can be turned into patterns using the `match_any` and `match_all` methods:
 
     ARTICLES = ["a", "the"]
     NOUNS = ["boy", "girl", "dog", "cat"]
@@ -64,7 +68,7 @@ Arrays can be turned into patterns using the match_any and match_all methods:
     [ARTICLES.match_any, [WS, [WS, ADJECTIVES.match_any, WS].match_all].match_any, NOUNS.match_any].match_all
     
 This is equivilent to 
-   
+
     ("a" | "the") & (WS | (WS & ("big" | "small" | "fierce" | "friendly") & WS)) & ("boy" | "girl" | "dog" | "cat")
     
 ### match? options
@@ -80,20 +84,30 @@ replace_with | nil | When a non-falsy value is supplied, the value will replace 
 
 Example of replace with:
 
-    "hello".match?("She said hello!")
+    > "hello".match?("She said hello!")
     => hello
-    "hello".match?("She said hello!", replace_with => "goodby")
+    > "hello".match?("She said hello!", replace_with => "goodby")
     => She said goodby!
+    
+#### Ignore case on a subpattern
 
+Sometimes its useful to run the matcher in the default case sensitive mode, and only turn off matching for one part of the pattern.  To do this
+prefix a subpattern with a "-".  For example
+
+    > (-"GIRL" | "boy").match?("A big girl!")
+    => girl
+    > (-"GIRL" | "boy").match?("A big BOY!")
+    => nil
+   
 ### Patterns, Subjects, Cursors, Alternatives, and Backtracking 
 
 A pattern is an object that responds to the match? method.  Cannonbol adds the match? method to Ruby strings, and regexes, and provides a number of _primitive_ patterns.  A pattern can be combined with another pattern using the &, and | operators.  There are also several primitive patterns that take a pattern and create a new pattern.  Here are some example patterns:
 
-    "hello" # matches any string containing hello
-    /\s+/   # matches one or more white space characters
+    "hello"  # matches any string containing hello
+    /\s+/    # matches one or more white space characters
     "hello" & /\s+/ & "there"  # matches "hello" and "there" seperated by white space
-    "hello" | "goodby"  # matches EITHER "hello" or "there"
-    ARB # a primitive pattern that matches anything (similar to /.*/)
+    "hello" | "goodby"         # matches EITHER "hello" or "there"
+    ARB      # a primitive pattern that matches anything (similar to /.*/)
     ("hello" | "goodby") & ARB & "Fred"  # matches "hello" or "goodby" followed by any characters and finally "Fred"
 
 Patterns are just objects, so they can be assigned to variables:
@@ -270,18 +284,19 @@ We can use this to clean up the palindrome pattern a little bit:
 
 Another way to get the capture variables is to interogate the value returned by match?.  The value returned by match? is a subclass of string, that has some extra methods.  One of these is the captured method which gives a hash of all the captured variables.  For example:
 
-    ("dog" | "cat").capture?(:pet).match?("He had a dog named Spot.").captured[:pet]
+    > ("dog" | "cat").capture?(:pet).match?("He had a dog named Spot.").captured[:pet]
     => dog
 
 You can also give a block to the match? method which will be called whether the block passes or not.  For example:
 
-    ("dog" | "cat").capture?(:pet).match?("He had a dog named Spot."){ |match| match.captured[:pet] if match}
+    > ("dog" | "cat").capture?(:pet).match?("He had a dog named Spot."){ |match| match.captured[:pet] if match}
     => dog
    
 The match? block can also explicitly name any capture variables you need to get the values of.  So for example:
 
-    pet_data = (POS(0) & ARBNO(("big" | "small").capture?(:size) | ("dog" | "cat").capture?(:pet) | LEN(1)) & RPOS(0))
-    pet_data.match?("He has a big dog!") { |m, pet, size| "type of pet: #{pet.upcase}, size: #{size.upcase}"}
+    > pet_data = (POS(0) & ARBNO(("big" | "small").capture?(:size) | ("dog" | "cat").capture?(:pet) | LEN(1)) & RPOS(0))
+    => #<Cannonbol::Concat .... etc
+    > pet_data.match?("He has a big dog!") { |m, pet, size| "type of pet: #{pet.upcase}, size: #{size.upcase}"}
     => type of pet: DOG, size: BIG
 
 If the match? block mentions capture variables that were not assigned in the match they get nil.
@@ -289,14 +304,14 @@ If the match? block mentions capture variables that were not assigned in the mat
 #### Initializing capture variables
 
 When used as a parameter to a primitve the capture variable may be given an initial value.   For example:
-    
+
     LEN(baz: 12)
 
-would match LEN(12) if :baz had not yet been set.
+would match `LEN(12)` if :baz had not yet been set.
 
 A second way to initialize (or update capture variables) is to combine capture variables with a capture block like this:
 
-    some_pattern.capture!(:baz) { |match, position, baz| baz || position * 2 } initializes :baz to position * 2
+    some_pattern.capture!(:baz) { |match, position, baz| baz || position * 2 } # initializes :baz to position * 2
     
 If a symbol is specified in a capture!, and there is a block, then the symbol will be set to the value returned by the block.
 
@@ -349,15 +364,13 @@ The difference is that FENCE will fail the whole match, but FENCE(pattern) will 
 
 These can be used together to do some interesting things.  For example
 
-    pattern = POS(0) & SUCCEED & (FENCE(TAB(n: 1).capture!(:n) { |m, p, n|  puts m; p+1 } | ABORT)) & FAIL
-    pattern.match?("abcd")
-    
-prints
-
+    > pattern = POS(0) & SUCCEED & (FENCE(TAB(n: 1).capture!(:n) { |m, p, n|  puts m; p+1 } | ABORT)) & FAIL;
+    * pattern.match?("abcd")
     a
     ab
     abc
     abcd
+    => nil
     
 The SUCCEED and FAIL primitives keep forcing the matcher to retry.  Eventually the TAB will fail causing the ABORT alternative to execute the matcher.
 
@@ -397,19 +410,24 @@ Cannonbol can be used to easily translate the email BNF spec into an email addre
 
 So for example we can even parse an obscure email with groups and routes
 
-    email = 'here is my "big fat \\\n groupen" : someone@catprint.com, Fred Nurph<@sub1.sub2@sub3.sub4:fred.nurph@catprint.com>;'
-    match = address.match?(email)
-    match.captured[:group_mailboxes].first.captured[:mailbox]
+    > email = 'here is my "big fat \\\n groupen" : someone@catprint.com, Fred Nurph<@sub1.sub2@sub3.sub4:fred.nurph@catprint.com>;'
+    => here is my "big fat \\\n groupen" : someone@catprint.com, Fred Nurph<@sub1.sub2@sub3.sub4:fred.nurph@catprint.com>;
+    > match = address.match?(email)
+    => here is my "big fat \\\n groupen" : someone@catprint.com, Fred Nurph<@sub1.sub2@sub3.sub4:fred.nurph@catprint.com>;
+    > match.captured[:group_mailboxes].first.captured[:mailbox]
     => someone@catprint.com
-    match.captured[:group_name]
+    > match.captured[:group_name]
     => here is my "big fat \\\n groupen
 
 
 ## Development
 
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `bin/console` for an interactive prompt that will allow you to experiment.
+After checking out the repo, run `bundle install` to install dependencies. 
 
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release` to create a git tag for the version, push git commits and tags, and push the `.gem` file to [rubygems.org](https://rubygems.org).
+### Specs
+
+Run `bundle exec rspec` to run the tests on your server environment
+Run `bundle exec rake rackup` and then point your browser to your machine to run the tests in the opal 
 
 ## Contributing
 
