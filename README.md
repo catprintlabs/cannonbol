@@ -252,7 +252,7 @@ end
 palindrome.match?('A man, a plan, a canal, Panama!") # succeeds!
 ```
 
-Using MATCH to define recursive patterns makes Cannonbol into a full blown BNF parser.  See the example [email address parser](A complete real world example)
+Using MATCH to define recursive patterns makes Cannonbol into a full blown BNF parser.  See the example [email address parser](#a-complete-real-world-example)
 
 ### Advanced capture techniques
 
