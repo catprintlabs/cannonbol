@@ -178,7 +178,7 @@ Cannonbol includes the complete set of SNOBOL4 + SPITBOL primitive patterns and 
 
 `POS(x)` Match ONLY if current cursor is at x.  POS(0) is the start of the string.
 
-`(POS(5) & ARB & POS(7)).match?("01234567") === "567"`
+`(POS(5) & ARB & POS(7)).match?("01234567") === "56"`
 
 `RPOS(x)` Just like POS except measured from the end of the string.  I.e. RPOS(0) is just after the last character.
 
