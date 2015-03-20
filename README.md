@@ -83,7 +83,7 @@ This is equivilent to
     
 ### The match? options
 
-The `match?` method shows above takes a couple of options to globally control the match process:
+The `match?` method shown above takes a couple of options to globally control the match process:
 
 option | default |  meaning
 ------|-----|-----
