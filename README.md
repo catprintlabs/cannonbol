@@ -35,14 +35,18 @@ Strings, Regexes and primitives are combined using & (concatenation) and | (alte
 
 Here is a simple pattern that matches a simple noun clause:
 
-    > ("a" | "the") & /\s+/ & ("boy" | "girl")
+```ruby
+> ("a" | "the") & /\s+/ & ("boy" | "girl")
+```
     
 This will match either "a" or "the" followed white space and then by "boy or "girl".  Okay!  Lets use it!
 
+```ruby
     > ("a" | "the") & /\s+/ & ("boy" | "girl").match?("he saw a boy going home")
     => "a boy"
     > ("a" | "the") & /\s+/ & ("boy" | "girl").match?("he saw a big boy going home")
     => nil
+```
 
 Now let's save the pieces of the match using the `capture?` (pronounced _capture IF_) method:
 
