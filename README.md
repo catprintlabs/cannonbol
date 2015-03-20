@@ -63,7 +63,7 @@ Now let's save the pieces of the match using the `capture?` (pronounced _capture
 
 The `capture?` method and its friend `capture!` (pronounced _capture NOW_) have many powerful features. 
 As shown above it can take a block which is passed the matching substring, _IF the match succeeds_.  
-The other features of the capture method will be detailed [below.](Advanced capture techniques)
+The other features of the capture method will be detailed [below.](#advanced-capture-techniques)
 
 Arrays can be turned into patterns using the `match_any` and `match_all` methods:
 
