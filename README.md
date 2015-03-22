@@ -121,7 +121,7 @@ A pattern is an object that responds to the match? method.  Cannonbol adds the m
 "hello"  # matches any string containing hello
 /\s+/    # matches one or more white space characters
 "hello" & /\s+/ & "there"  # matches "hello" and "there" seperated by white space
-"hello" | "goodby"         # matches EITHER "hello" or "there"
+"hello" | "goodby"         # matches EITHER "hello" or "goodby"
 ARB      # a primitive pattern that matches anything (similar to /.*/)
 ("hello" | "goodby") & ARB & "Fred"  # matches "hello" or "goodby" followed by any characters and finally "Fred"
 ```
@@ -140,7 +140,7 @@ matching begins again one character to the right.  This continues until a match 
 
 The current position of the matcher in the string is the _cursor_.  The cursor begins at zero and as each character is matched it moves to the right.  If the match fails (and anchor is false) then the match is restarted with the cursor at position 1, etc.
 
-Alternatives are considered left to right as specified in the pattern.  Once an alternative is matched, the matcher moves on to the next part of the match, but it does remember the alternative, and if matching fails at a later component, the matcher will back up and try the next alternative.  For example:
+Alternatives are considered left to right as specified in the pattern.  Once an alternative is matched, the matcher moves on to the next element in the pattern, but it does remember the alternative, and if matching fails at a later pattern, the matcher will back up and try the next alternative.  For example:
 
 ```ruby
 a_pattern = "a" | "aaa" | "aa"
@@ -184,6 +184,8 @@ Cannonbol includes the complete set of SNOBOL4 + SPITBOL primitive patterns and 
 
 `("hello" & RPOS(0)).match?("she said hello!")` would fail.
 
+`("hello" & RPOS(1)).match?("she said hello!")` would succeed.
+
 `TAB(x)` Is equivilent to `ARB & POS(x)`.  In otherwords match zero or more characters up to the x'th character. Fails if x < the current cursor.
 
 `RTAB(x)`  You guessed it === `ARB & RPOS(x)`
@@ -211,30 +213,37 @@ To allow for this all primitive patterns can take a block.  The block is evaluat
 
 Here is a method that will parse a set of fixed width fields, where the widths are supplied as arguments to the method:
 
-    def parse(s, *widths)
+```ruby
+def parse(s, *widths)
       fields = []
       (ARBNO(LEN {widths.shift}.capture? {|field| fields << field}) & RPOS(0)).match?(s)
       fields
     end
+```
 
 To really get into the power of delayed evaluation however we need to add two more concepts:
 
-The MATCH primitive, and the capture! (pronounced _capture NOW_) method.  
+The `MATCH` primitive, and the `capture!` (pronounced _capture NOW_) method.  
 
-The capture? (pronounced _capture IF_) method executes when the match has completed successfully.  In contrast the capture! method calls its block as soon as its sub-pattern matches.  Using capture! allows you to pick up values during one phase of the match and then use those values later.  
+The `capture?` (pronounced _capture IF_) method executes _IF_ the match has completed successfully.  In contrast the `capture!` method calls its block as soon as its sub-pattern matches.  Using `capture!` allows you to pick up values during one phase of the match and then use those values later.  
 
-Meanwhile MATCH takes a pattern as its argument (like ARBNO) but will only match the pattern once.  The power in MATCH is when it is used with a delayed evaluation block.  Together MATCH and capture! allow for patterns that are much more powerful than simple regexes.  For example here is a palindrome matcher:
+Meanwhile `MATCH` takes a pattern as its argument (like `ARBNO`) but will only match the pattern once.  The power in `MATCH` is when it is used with a delayed evaluation block.  Together `MATCH` and `capture!` allow for patterns that are much more powerful than simple regexes.  For example here is a palindrome matcher:
     
-     palindrome = MATCH do | ; c|
-       /\W*/ & LEN(1).capture! { |m| c = m } & /\W*/ & ( palindrome | LEN(1) | LEN(0)) & /\W*/ & MATCH { c } 
-     end 
+```ruby
+palindrome = MATCH do | ; c|
+  /\W*/ & LEN(1).capture! { |m| c = m } & /\W*/ & ( palindrome | LEN(1) | LEN(0)) & /\W*/ & MATCH { c } 
+end 
+```
 
 Lets see it again with some comments
 
 ```ruby
 palindrome = MATCH do | ; c | 
-  # By putting the MATCH pattern in a block to be evaluated later we can use palindrome in its definition.
-  # Just to keep things clean and robust we declare c (the character matched) as local to the block.
+
+  # By putting the MATCH pattern in a block to be evaluated later 
+  # we can use palindrome in its own definition.
+  # Just to keep things clean and robust we declare c 
+  # (the character matched) as local to the block.
   
   /\W*/ &                          # skip any white space
   LEN(1).capture! { |m| c = m } &  # grab the next character now and save it in c
@@ -252,11 +261,11 @@ end
 palindrome.match?('A man, a plan, a canal, Panama!") # succeeds!
 ```
 
-Using MATCH to define recursive patterns makes Cannonbol into a full blown BNF parser.  See the example [email address parser](#a-complete-real-world-example)
+Using `MATCH` to define recursive patterns makes Cannonbol into a full blown BNF parser.  See the example [email address parser](#a-complete-real-world-example)
 
 ### Advanced capture techniques
 
-Both capture? and capture! have a number of useful features.
+Both `capture?` and `capture!` have a number of useful features.
 
 * They can take a block which is passed the matching substring.
 * As well as the current match, they can pass the current cursor position and the current value of capture variable.
@@ -277,7 +286,7 @@ will shovel each word it matches into the words array.  You could use it like th
 ```ruby
 words = []
 (ARBNO(word).match?("a big strange, long sentence!")
-```ruby
+```
 
 Using `capture? { |m| puts m }` is handy for debugging your patterns.
 
@@ -291,7 +300,7 @@ The second parameter of the capture block will recieve the current cursor positi
  => i found at 4
 ```
     
-Notice the use of RPOS(0) which will force the pattern to look at every character in the subject, until the pattern finally fails.  By using capture! (capture NOW) we record every hit, even though the pattern fails in the end.
+Notice the use of `RPOS(0)` which will force the pattern to look at every character in the subject, until the pattern finally fails.  By using `capture!` (capture _now_) we record every hit, even though the pattern fails in the end.
 
 #### Using capture variables
 
@@ -301,12 +310,12 @@ If the capture methods are supplied with a symbol, then the captured value will 
 some_pattern.capture!(:value)
 ```
     
-would save the string matched by some_pattern into the capture variable called :value.  
+would save the string matched by `some_pattern` into the capture variable called `:value`.  
 
 There are a couple of ways to retrieve the capture variables:
 
 Any primitive pattern that takes a parameter can use the value of a capture variable.  So for example `LEN(:foo)` means 
-take the current value of the capture variable :foo as the parameter to LEN.
+take the current value of the capture variable `:foo` as the parameter to `LEN`.
 
 We can use this to clean up the palindrome pattern a little bit:
 
