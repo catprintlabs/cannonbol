@@ -392,7 +392,7 @@ More powerful yet is the fact that every match string sent to a capture variable
     
 ```ruby
 > subject_clause = article & noun.capture!(:subject) ;
-* object_clause = article & noun.capture!:object);
+* object_clause = article & noun.capture!(:object);
 * verb_clause = ...
 * sentence = (subject_clause & verb_clause & object_clause & ".");
 * sentences = ARBNO(sentence.capture?(:sentences => [])) & RPOS(0);
