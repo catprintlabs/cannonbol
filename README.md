@@ -1,5 +1,7 @@
 # CannonBol
 
+[![Join the chat at https://gitter.im/catprintlabs/cannonbol](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/catprintlabs/cannonbol?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 CannonBol is a ruby DSL for patten matching based on SNOBOL4 and SPITBOL.
 
 * Makes complex patterns easier to read and write!
