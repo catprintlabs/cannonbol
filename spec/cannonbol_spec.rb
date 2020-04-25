@@ -1,21 +1,29 @@
 require 'spec_helper'
 
+class Regexp
+  include Cannonbol::CompatibilityAdapter
+end
+
+class String
+  include Cannonbol::CompatibilityAdapter
+end
+
 describe Cannonbol do
 
   it 'has a version number' do
     expect(Cannonbol::VERSION).not_to be nil
   end
-  
+
   it 'can build and match a simple pattern' do
     expect('hello'.match?('he said hello to her')).to eq('hello')
     expect('hello'.match?('he said goodby to her')).to be_falsy
   end
-  
+
   it 'can run in anchor mode' do
     expect('hello'.match?('he should have said hello first', anchor: true)).to be_falsy
     expect('hello'.match?('he should have said hello first')).to be_truthy
   end
-  
+
   it 'can raise an error on failure' do
     expect { 'hello'.match?('never say goodby', raise_error: true) }.to raise_error
   end
@@ -23,7 +31,7 @@ describe Cannonbol do
   it 'can match alternatives' do
     say_hello_or_goodby = 'hello' | 'goodby'
     expect(say_hello_or_goodby.match?('he said hello!')).to eq('hello')
-    
+
     expect(say_hello_or_goodby.match?('he said goodby!')).to eq('goodby')
     expect(say_hello_or_goodby.match?('he said gaday mate!')).to be_falsy
   end
@@ -31,25 +39,29 @@ describe Cannonbol do
   it 'can match concatenated patterns' do
     expect(('this' & 'that' & 'the' & 'other').match?('i can match thisthattheother okay!')).to eq('thisthattheother')
   end
-  
+
   it "will backtrack to match a pattern" do
     expect(('can' & ('n' | 'non') & ('o' | 'b') & 'ol').match?('snobol4 + ruby = cannonbol!')).to eq('cannonbol')
   end
-  
+
+  it 'defines the matches operator' do
+    expect(('can' & ('n' | 'non') & ('o' | 'b') & 'ol').matches?('snobol4 + ruby = cannonbol!')).to eq('cannonbol')
+  end
+
   it 'can call a block on a submatch' do
     ("'" & ('so long' | 'hello' | 'goodby').capture? { |match| expect(match).to eq('hello')} & "'").match?("it was great to say 'hello' today", raise_error: true)
   end
-  
+
   it 'will execute a conditional capture block even if the match fails' do
     block_was_called = false
     ("'" & ('so long' | 'hello' | 'goodby').capture? { |match| block_was_called = true } & "'").match?("it was great to say 'sawadii kaap' today")
     expect(block_was_called).to be_falsy
   end
-  
+
   it 'can use the REM primitive pattern' do
     expect(("hello" & REM).match?('he said hello to her')).to eq('hello to her')
   end
-  
+
 
   it 'can use the ARB primitive pattern' do
     ("O" & ARB.capture? { |match| expect(match).to eq('UNT') } & "A").match?('MOUNTAIN', raise_error: true)
@@ -61,7 +73,7 @@ describe Cannonbol do
     expect(( ("Z" | "I" | "U") & LEN(36) & ("ME" | "U")).match?("Hey! I am separated by 36 characters from U")).to be_truthy
     expect(( ("Z" | "I" | "U") & LEN(35) & ("ME" | "U")).match?("Hey! I am separated by 36 characters from U")).to be_falsy
   end
-  
+
   it 'can delay evaluation of parameters to primitive patterns' do
     expected_length = nil
     pattern = ("Z" | "I" | "U") & LEN {expected_length} & ("ME" | "U")
@@ -70,7 +82,7 @@ describe Cannonbol do
     expected_length = 3
     expect(pattern.match?("Z123ME")).to be_truthy
   end
-  
+
   it 'can use POS and RPOS primitive patterns' do
     s = 'ABCDA'
     expect((POS(0) & 'B').match?(s)).to be_falsy
@@ -78,66 +90,66 @@ describe Cannonbol do
     (POS(3) & LEN(1).capture? { |match| expect(match).to eq('D') }).match?(s, raise_error: true)
     expect((POS(0) & 'ABCD' & RPOS(0)).match?(s)).to be_falsy
   end
-  
+
   it 'can use TAB and RTAB primitive patterns' do
     s = '   X1234ABCD9012345XYZZY'
-    ( 'X' & LEN(4) & 
-      TAB(12).capture? { |match| expect(match).to eq('ABCD') } & 
+    ( 'X' & LEN(4) &
+      TAB(12).capture? { |match| expect(match).to eq('ABCD') } &
       RTAB(5).capture? { |match| expect(match).to eq('9012345') }
     ).match?(s, raise_error: true)
   end
-  
+
   it "has a TAB and RTAB matches the null string" do
     pattern = POS(0) & TAB(0).capture? { |m| expect(m).to eq("") } & ARB & RPOS(0) & RTAB(0).capture? { |m| expect(m).to eq("")}
     pattern.match?("hello", raise_error: true)
   end
-  
+
   it 'can use ANY and NOTANY primitive patterns' do
     vowel = ANY('AEIOU')
     consonant = NOTANY('AEIOU')
     expect(vowel.match?('HELLO')).to eq('E')
     expect(consonant.match?('EASY')).to eq('S')
   end
-  
+
   it 'will SPAN a number of characters' do
     expect(SPAN('1234567890').match?('The number 152 is stuck in here!')).to eq("152")
   end
-  
+
   it 'will BREAK when it hits a non matching character' do
     expect(BREAK('1234567890').match?('Before 12')).to eq('Before ')
   end
-  
+
   it 'can use the BREAKX primitive pattern' do
     (BREAKX('E').capture? { |match| expect(match).to eq("INTEG") } & 'ER').match?('INTEGERS', raise_error: true)
   end
-  
+
   it 'can replace the match with a fixed value' do
     expect('hello'.match?("she said hello", replace_match_with: "goodby")).to eq("she said goodby")
-  end 
-  
+  end
+
   it 'can replace the match using a block' do
     match_value = nil
     pattern = ('hello' | 'goodby').capture? { |match| match_value = match}
     string = 'she said hello'
     expect(pattern.match?(string) { "she said #{match_value == 'hello' ? 'sawadii kaa' : 'choke dee kaa'}"}).to eq('she said sawadii kaa')
   end
-    
-  
+
+
   it 'can use regex patterns' do
     pattern = /\s*/ & /[a-zA-Z]+/.capture? { |the_word| expect(the_word).to eq('hello') }
     pattern.match?("      hello!", raise_error: true)
     pattern.match?("hello", raise_error: true)
     expect(pattern.match?("...")).to be_falsy
   end
-  
+
   it 'can assign match variables using a block' do
     pattern = ('he' | 'she').capture?(:gender) & /\s+/ & 'said' & /\s+/ & ('hello' | 'goodby').capture?(:greeting)
     string = 'Then she  said  hello'
-    expect(pattern.match?(string) do | match, gender, greeting| 
+    expect(pattern.match?(string) do | match, gender, greeting|
       "klaw #{greeting == 'hello' ? 'sawadii' : 'choke dee'} #{gender == 'he' ? 'kaap' : 'kaa'}"
     end).to eq("klaw sawadii kaa")
-  end  
-  
+  end
+
   it 'can returns the match data as a hash' do
     pattern = ('he' | 'she').capture?(:gender) & /\s+/ & 'said' & /\s+/ & ('hello' | 'goodby').capture?(:greeting)
     string = 'Then she  said  hello'
@@ -146,14 +158,14 @@ describe Cannonbol do
     expect(match_data.captured[:greeting]).to eq("hello")
     expect(match_data).to eq("she  said  hello")
     expect(pattern.match?("foo bar")).to be_falsy
-  end  
-  
+  end
+
   it 'can replace the match string' do
     pattern = "boy" | "girl" | "man" | "woman"
     string = "There was a man here."
     expect(pattern.match?(string).replace_match_with("person")).to eq("There was a person here.")
   end
-  
+
   it 'can do conditional assignments during matching' do
     conditional_matches = []
     pattern = ('car' | 'plane' | 'bike').capture! { | m | conditional_matches << m } & '!'
@@ -161,7 +173,7 @@ describe Cannonbol do
     expect(pattern.match?(string)).to eq("bike!")
     expect(conditional_matches).to eq(["car", "plane", "bike"])
   end
-  
+
   it 'can do conditional assignments during matching even if the match fails' do
     arb_matches = []
     pattern = ARB.capture! { | match | arb_matches << match } & 'gotcha'
@@ -169,23 +181,23 @@ describe Cannonbol do
     expect(pattern.match?(string, anchor: true)).to be_falsy
     expect(arb_matches).to eq(["","1","12","123","1234","12345"])
   end
-  
+
   it 'can insert a string at the beginning of match' do
     expect(POS(0).match?("hello there").replace_match_with("well ")).to eq("well hello there")
   end
-  
+
   it 'can save and retrieve values using capture and MATCH' do
     pattern = LEN(5).capture!(:first_five) & "|" & MATCH(:first_five)
     string = "12345|12345"
     expect(pattern.match?(string).captured[:first_five]).to eq('12345')
   end
-  
+
   it 'can name, and overwrite a capture variable' do
     palindrome = ARB.capture!(:front) { |m, p, front|  m.reverse} & MATCH(:front) & RPOS(0)
     expect(palindrome.match?('toot')).to be_truthy
     expect(palindrome.match?('boot')).to be_falsy
   end
-  
+
   it 'can capture the match, position, and the current value of the capture variable, and set the match variable' do
     pattern = ARB.capture!(data: []) { |m, p, d| d + [m, p]}.capture?(final_data: []) { |m, p, d| d + [m, p] } & RPOS(0)
     pattern.match?("ABC") do |m, data, final_data|
@@ -193,40 +205,40 @@ describe Cannonbol do
       expect(final_data).to eq(["ABC", 3])
     end
   end
-  
+
   it "can match the empty string" do
     expect((LEN(1) & ("" & RPOS(0) | "e") & "").match?("hello")).to eq("he")
   end
-  
+
   it 'has a ARBNO primitive pattern' do
     pattern = POS(0) & ARBNO("A" | "B") & RPOS(0)
     expect(pattern.match? "ABBAAABBBA").to be_truthy
     expect(pattern.match? "ABBAXBAA").to be_falsy
   end
-    
-  
+
+
   it 'can match a palindrome' do
     palindrome = /\s*/ & LEN(1).capture!(:c)  & /\s*/ & ( MATCH {palindrome} | LEN(1) | LEN(0) ) & /\s*/ & MATCH(:c) & /\s*/
     expect(palindrome.match?("a man a plan a canal panama")).to be_truthy
     expect(palindrome.match?("palindrome")).to be_falsy
   end
-  
+
   it 'can match a palindrome rev 2' do
     palindrome = MATCH do | c |  # can't do | ; c | in Opal
-      /\W*/ & LEN(1).capture! { |m| c = m } & /\W*/ & ( palindrome | LEN(1) | LEN(0)) & /\W*/ & MATCH { c } 
-    end 
-    expect(palindrome.match?("A man, a plan, a canal Panama!", ignore_case: true)).to be_truthy
-    expect(palindrome.match?("palindrome")).to be_falsy    
-  end 
-  
+      /\W*/ & LEN(1).capture! { |m| c = m } & /\W*/ & ( palindrome | LEN(1) | LEN(0)) & /\W*/ & MATCH { c }
+    end
+    expect(palindrome.match?("A man, a plan, a canal Panama!", insensitive: true)).to be_truthy
+    expect(palindrome.match?("palindrome")).to be_falsy
+  end
+
   it 'can nest patterns' do
     fn_name = "foo" | "bar"
     var_name = "A" | "B"
     fn_call = POS(0) & fn_name & "(" & var_name & ")" & RPOS(0)
     expect(fn_call.match?("bar(B)")).to be_truthy
   end
-    
-  
+
+
   it 'can match recursive patterns' do
     #? ITEM = SPAN(“0123456789") | *LIST
     #? LIST = ”(“ ITEM ARBNO(”," ITEM) “)”
@@ -252,26 +264,26 @@ describe Cannonbol do
     expect(pattern.match?('--AB-1-')).to eq('A')
     expect(pattern.match?('--1B-A-')).to be_falsy
   end
-    
+
   it "has a FAIL primitive pattern" do
     some_chars = ""
     ( LEN(1).capture! { |char| some_chars += char } & FAIL ).match?("hello world")
     expect(some_chars).to eq("hello world")
   end
-  
+
   it "has a FENCE primitive pattern" do
     pattern = ANY('AB') & FENCE & '+'
     expect(pattern.match?('1AB+' )).to be_falsy
     expect(pattern.match?('1A+')).to eq("A+")
     expect((FENCE & "B").match?("ABC")).to be_falsy
   end
-  
+
   it "can FENCE a sub-pattern" do
     pattern = FENCE(ANY('AB') & 'x')  & '+'
     expect(pattern.match?('1AxBx+' )).to be_falsy
     expect(pattern.match?('1ABx+')).to eq('Bx+')
   end
-  
+
   it "has a SUCCEED primitive pattern" do
     #? P = FENCE(TAB(*(N + 1)) $ OUTPUT @N | ABORT)
     #? “abcd” ? POS(0) $ N SUCCEED P FAIL
@@ -285,40 +297,43 @@ describe Cannonbol do
     pattern.match?("abcd")
     expect(matches).to eq(['a', 'ab', 'abc', 'abcd'])
   end
-  
+
   it "has an 'ignore case' operator" do
     expect((-"boy").match?("Boy")).to be_truthy
+    expect(("boy".insensitive).match?("Boy")).to be_truthy
     expect((-("boy" | "girl")).match?("A big Girl!")).to be_truthy
+    expect((("boy" | "girl").insensitive).match?("A big Girl!")).to be_truthy
     expect((-"GIRL" | "boy").match?("A big girl!")).to be_truthy
     expect((-"GIRL" | "boy").match?("A big BOY!")).to be_falsy
-    expect(("boy" | "girl").match?("Its a BOY!", ignore_case: true)).to be_truthy
+    expect(("boy" | "girl").match?("Its a BOY!", insensitive: true)).to be_truthy
     expect(/XYZZY/i.match?("xyZZy")).to be_truthy
     expect((-/XYZZY/).match?("xyZZy")).to be_truthy
+    expect((/XYZZY/.insensitive).match?("xyZZy")).to be_truthy
     expect(/XYZZY/.match?("xyZZy", ignore_case: true)).to be_truthy
     expect(/XYZZY/.match?("xyZZy", ignore_case: false)).to be_falsy
   end
-  
+
   it "has a match_any array operator" do
     expect(["boy", "girl"].match_any.match?("You just had a BOY!", ignore_case: true)).to eq("BOY")
   end
-  
+
   it "has a match_all array operator" do
     expect(["boy", ARB, "girl"].match_all.match?("I have three boys and one girl.")).to eq("boys and one girl")
   end
-  
+
   it "ARBNO will backtrack through a SPAN" do
     chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ@"
     pattern = POS(0) & SPAN(chars) & "." & ARBNO(SPAN(chars)) & "@" & SPAN(chars) & RPOS(0)
     expect(pattern.match?("XY.ZZY@HELLO", ignore_case: true)).to be_truthy
   end
-  
+
   it 'works for all the readme examples' do
-   
+
     expect((("a" | "the") & /\s+/ & ("boy" | "girl")).match?("he saw a boy going home")).to eq("a boy")
     expect((("a" | "the") & /\s*/ & /\w*/ & /\s*/ & ("boy" | "girl")).match?("he saw a big boy going home")).to eq("a big boy")
     article, noun = nil, nil
     pattern = ("a" | "the").capture? { |m| article = m } & /\s+/ & ("boy" | "girl").capture? { |m| noun = m }
-    pattern.match?("he saw the girl going home") 
+    pattern.match?("he saw the girl going home")
     expect(article).to eq("the")
     expect(noun).to eq("girl")
     ARTICLES = ["a", "the"]
@@ -339,13 +354,13 @@ describe Cannonbol do
     end
     #            "123451231234123456"
     expect(parse("boy  batcat   tree",5,3,4,6)).to eq(["boy","bat", "cat", "tree"])
-    pet_survey = 
-      (POS(0) & ARBNO(("big" | "small").capture?(:size) | ("dog" | "cat").capture?(:pet) | LEN(1)) & RPOS(0)).match?("He has a big dog!", raise_error: true) do |m, pet, size| 
+    pet_survey =
+      (POS(0) & ARBNO(("big" | "small").capture?(:size) | ("dog" | "cat").capture?(:pet) | LEN(1)) & RPOS(0)).match?("He has a big dog!", raise_error: true) do |m, pet, size|
         "type of pet: #{pet.upcase}, size: #{size.upcase}"
       end
-    
+
     expect(pet_survey).to eq("type of pet: DOG, size: BIG")
-    
+
   end
 
 
