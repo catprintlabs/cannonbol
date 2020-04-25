@@ -9,7 +9,7 @@ CannonBol is a ruby DSL for patten matching based on SNOBOL4 and SPITBOL.
 * Complete SNOBOL4 + SPITBOL extensions!
 * Based on the well documented, proven SNOBOL4 language!
 * Simple syntax looks great within your ruby code!
-* Tested with ruby 1.9.3, 2.1.1 and [Opal](www.opalrb.org)
+* Tested with ruby 1.9.3 - 2.6.3 and [Opal](www.opalrb.org)
 
 ## Installation
 
